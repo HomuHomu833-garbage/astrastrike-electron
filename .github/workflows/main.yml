@@ -12,19 +12,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - os: ubuntu-latest
-            discord: true
-          - os: macos-26
-            discord: true
-          - os: macos-15-intel
-            discord: true
-          - os: windows-2022
-            discord: true
-          - os: ubuntu-24.04-arm
-            discord: false
-          - os: windows-11-arm
-            discord: false
+        os:
+          - ubuntu-latest
+          - ubuntu-24.04-arm
+          - macos-26
+          - macos-15-intel
+          - windows-2022
+          - windows-11-arm
     steps:
       - name: Checkout
         uses: actions/checkout@main
@@ -37,12 +31,6 @@ jobs:
       - name: Setup Package
         run: npm install
 
-      - name: Build Discord Addon
-        if: matrix.discord
-        run: npm run build-discord
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Build Package
         run: npm run package
 
@@ -50,10 +38,10 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           brew install ldid
-          bash ./scripts/mac-sign.sh out/Wolvesville-darwin-*/Wolvesville.app entitlements.plist
+          bash ./scripts/mac-sign.sh out/AstraStrike-darwin-*/AstraStrike.app entitlements.plist
 
       - name: Upload Artifact
         uses: actions/upload-artifact@main
         with:
-          name: Wolvesville-${{ matrix.os }}
-          path: out/Wolvesville-*-*/*
+          name: AstraStrike-${{ matrix.os }}
+          path: out/AstraStrike-*-*/*

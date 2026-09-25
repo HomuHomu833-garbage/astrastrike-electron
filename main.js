@@ -1,7 +1,6 @@
-const { app, ipcMain, BrowserWindow, shell, Menu } = require('electron');
+const { app, BrowserWindow, shell, Menu } = require('electron');
 const { join } = require('path');
 const os = require('os');
-const config = require('./config.js');
 
 if (require('electron-squirrel-startup')) {
   app.quit();
@@ -11,34 +10,10 @@ const gotTheLock = app.requestSingleInstanceLock();
 
 const isWindows = os.platform() === 'win32';
 
-if (isWindows) {
-  app.commandLine.appendSwitch('in-process-gpu');
-  app.commandLine.appendSwitch('disable-direct-composition');
-}
+const GAME_URL = 'https://astrastrike.fun';
 
-const discord = require('./native/discord');
-
-let discordInitialized = false;
-let callbacksInterval = null;
 let mainWindow = null;
 let popupWindow = null;
-
-const initDiscord = () => {
-  try {
-    discord.initialize(config.discordAppId);
-    discord.connect();
-    discordInitialized = true;
-  } catch (e) {
-    console.error('Discord initialization failed:', e.message);
-    discordInitialized = false;
-  }
-  return discordInitialized;
-};
-
-const sendToWindow = (channel, ...args) => {
-  const win = mainWindow && !mainWindow.isDestroyed() ? mainWindow : BrowserWindow.getAllWindows()[0];
-  if (win && !win.isDestroyed()) win.webContents.send(channel, ...args);
-};
 
 const focusMainWindow = () => {
   if (!mainWindow || mainWindow.isDestroyed()) return;
@@ -51,14 +26,13 @@ const createWindow = () => {
   const win = new BrowserWindow({
     width: 1280,
     height: 720,
-    title: 'Wolvesville',
+    title: 'Astra Strike',
     fullscreen: true,
     show: false,
-    backgroundColor: '#111111',
+    backgroundColor: '#0c1118',
     icon: join(__dirname, 'src', 'icons', isWindows ? 'icon.ico' : 'icon.icns'),
     autoHideMenuBar: true,
     webPreferences: {
-      preload: join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
@@ -68,43 +42,7 @@ const createWindow = () => {
     },
   });
 
-  win.loadURL('https://www.wolvesville.com');
-
-  // Backup for the preload's window.steam/Paddle patch, in case it lands late.
-  // Idempotent (guarded by window.__wvSteamPatched).
-  const STEAM_PATCH = `(() => {
-    if (window.__wvSteamPatched) return;
-    window.__wvSteamPatched = true;
-    try {
-      let paddleRead = false, realPaddle, completed = false;
-      const wrap = (p) => {
-        if (!p || p.__wvWrapped || typeof p.Initialize !== 'function') return p;
-        p.__wvWrapped = true;
-        const origInit = p.Initialize.bind(p);
-        p.Initialize = (opts) => {
-          const orig = opts && opts.eventCallback;
-          return origInit(Object.assign({}, opts, {
-            eventCallback: (ev) => {
-              try {
-                const n = (ev && ev.name) || '';
-                if (n.indexOf('completed') !== -1) completed = true;
-                if (n.indexOf('closed') !== -1) { if (!completed) setTimeout(() => location.reload(), 150); completed = false; }
-              } catch (e) {}
-              if (typeof orig === 'function') orig(ev);
-            },
-          }));
-        };
-        return p;
-      };
-      realPaddle = wrap(window.Paddle);
-      Object.defineProperty(window, 'Paddle', { configurable: true,
-        get() { paddleRead = true; queueMicrotask(() => { paddleRead = false; }); return realPaddle; },
-        set(v) { realPaddle = wrap(v); } });
-      Object.defineProperty(window, 'steam', { configurable: true,
-        get() { if (paddleRead) { paddleRead = false; return false; } return true; } });
-    } catch (e) {}
-  })();`;
-  win.webContents.on('dom-ready', () => win.webContents.executeJavaScript(STEAM_PATCH).catch(() => {}));
+  win.loadURL(GAME_URL);
 
   win.once('ready-to-show', () => win.show());
 
@@ -133,22 +71,22 @@ const createWindow = () => {
       return { action: 'deny' };
     }
 
-    const isWolvesville = host === 'wolvesville.com' || host.endsWith('.wolvesville.com');
-    // Sign-in / checkout providers must open in-app so their popup can talk back
-    // to the opener (window.opener / postMessage) and complete the flow.
-    const isAuthOrPay = /(?:^|\.)(?:google|gstatic|googleapis|apple|appleid|discord|discordapp|facebook|paddle)\.com$/.test(host);
+    const isAstraStrike = host === 'astrastrike.fun' || host.endsWith('.astrastrike.fun');
+    // Sign-in providers must open in-app so their popup can talk back to the
+    // opener (window.opener / postMessage) and complete the flow.
+    const isAuth = /(?:^|\.)(?:google|gstatic|googleapis|apple|appleid|discord|discordapp)\.com$/.test(host);
     const isLinkClick = disposition === 'foreground-tab' || disposition === 'background-tab';
 
-    // Plain external link clicks open in the system browser; popups (sign-in,
-    // checkout) and wolvesville.com windows stay in-app.
-    if (!isWolvesville && !isAuthOrPay && isLinkClick) {
+    // Plain external link clicks open in the system browser; popups (sign-in)
+    // and astrastrike.fun windows stay in-app.
+    if (!isAstraStrike && !isAuth && isLinkClick) {
       shell.openExternal(url);
       return { action: 'deny' };
     }
 
-    // Reuse one window only for wolvesville.com popups (Alt+Tab clone fix).
-    // Auth/checkout popups get a fresh window so window.opener stays intact.
-    if (isWolvesville && popupWindow && !popupWindow.isDestroyed()) {
+    // Reuse one window only for astrastrike.fun popups (Alt+Tab clone fix).
+    // Auth popups get a fresh window so window.opener stays intact.
+    if (isAstraStrike && popupWindow && !popupWindow.isDestroyed()) {
       popupWindow.loadURL(url);
       popupWindow.focus();
       return { action: 'deny' };
@@ -162,7 +100,7 @@ const createWindow = () => {
         parent: win,
         skipTaskbar: true,
         autoHideMenuBar: true,
-        backgroundColor: '#111111',
+        backgroundColor: '#0c1118',
         webPreferences: {
           contextIsolation: true,
           nodeIntegration: false,
@@ -187,29 +125,10 @@ const createWindow = () => {
   return win;
 };
 
-const registerDiscordCallback = (setter, channel) => {
-  try {
-    discord[setter]((data) => sendToWindow(channel, data));
-  } catch (e) {
-    console.error(`Discord ${setter} registration failed:`, e.message);
-  }
-};
-
 if (!gotTheLock) {
   app.quit();
 } else {
   app.on('second-instance', focusMainWindow);
-
-  initDiscord();
-
-  callbacksInterval = setInterval(() => {
-    if (!discordInitialized) return;
-    try {
-      discord.runCallbacks();
-    } catch (e) {
-      console.error('Discord runCallbacks failed:', e.message);
-    }
-  }, 1000 / 30);
 
   app.whenReady().then(() => {
     Menu.setApplicationMenu(null);
@@ -218,98 +137,9 @@ if (!gotTheLock) {
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow();
     });
-
-    if (discordInitialized) {
-      registerDiscordCallback('setActivityJoinCallback', 'DISCORD_ACTIVITY_JOIN');
-      registerDiscordCallback('setStatusChangedCallback', 'DISCORD_STATUS_CHANGED');
-      try {
-        discord.setTokenExpirationCallback(() => sendToWindow('DISCORD_TOKEN_EXPIRED'));
-      } catch (e) {
-        console.error('Discord setTokenExpirationCallback registration failed:', e.message);
-      }
-    }
-
-    ipcMain.on('EXIT_GAME', () => {
-      app.exit();
-    });
-
-    ipcMain.on('OPEN_URL', (event, url) => {
-      if (typeof url === 'string' && /^https?:\/\//.test(url)) shell.openExternal(url);
-    });
-
-    const NOT_INITIALIZED = () => Promise.reject(new Error('DISCORD_NOT_INITIALIZED'));
-
-    ipcMain.on('UPDATE_DISCORD_PRESENCE', (event, presence) => {
-      if (!discordInitialized) return;
-      try {
-        discord.updatePresence(presence);
-      } catch (e) {
-        console.error('Discord updatePresence failed:', e.message);
-      }
-    });
-
-    ipcMain.handle('DISCORD_SEND_INVITE', (event, { userId, message }) => {
-      if (!discordInitialized) return NOT_INITIALIZED();
-      try {
-        return discord.sendInvite(userId, message);
-      } catch (e) {
-        console.error('Discord sendInvite failed:', e.message);
-        throw e;
-      }
-    });
-
-    ipcMain.handle('DISCORD_IS_AUTHENTICATED', () => {
-      if (!discordInitialized) return NOT_INITIALIZED();
-      return discord.isAuthenticated();
-    });
-
-    ipcMain.handle('DISCORD_GET_STATUS', () => {
-      if (!discordInitialized) return NOT_INITIALIZED();
-      return discord.getStatus();
-    });
-
-    ipcMain.handle('DISCORD_GET_RELATIONSHIPS', () => {
-      if (!discordInitialized) return NOT_INITIALIZED();
-      return discord.getRelationships();
-    });
-
-    ipcMain.handle('DISCORD_UPDATE_TOKEN', (event, token) => {
-      if (!discordInitialized) return NOT_INITIALIZED();
-      return new Promise((resolve, reject) => {
-        discord.updateToken(token, (err) => {
-          if (err) reject(new Error(err));
-          else resolve();
-        });
-      });
-    });
-
-    ipcMain.handle('DISCORD_CONNECT', () => {
-      if (discordInitialized) {
-        try {
-          discord.connect();
-          return true;
-        } catch (e) {
-          console.error('Discord: reconnect failed:', e.message);
-          return false;
-        }
-      }
-      return initDiscord(); // retry init if it failed at startup
-    });
   });
 }
 
 app.on('window-all-closed', () => {
-  if (callbacksInterval) {
-    clearInterval(callbacksInterval);
-    callbacksInterval = null;
-  }
-  if (discordInitialized) {
-    try {
-      discord.shutdown();
-    } catch (e) {
-      console.error('Discord shutdown failed:', e.message);
-    }
-    discordInitialized = false;
-  }
   if (process.platform !== 'darwin') app.quit();
 });

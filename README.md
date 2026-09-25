@@ -1,1 +1,1 @@
-de-steamed version of Wolvesville
+Desktop version of [Astra Strike](https://astrastrike.fun).

@@ -1,10 +1,8 @@
 module.exports = {
   packagerConfig: {
-    asar: {
-      unpack: '{**/native/discord/build/Release/discord_addon.node,**/native/discord/build/Release/*.so,**/native/discord/build/Release/*.dylib,**/native/discord/build/Release/*.dll}',
-    },
+    asar: true,
     icon: './src/icons/icon',
-    name: 'Wolvesville',
+    name: 'AstraStrike',
     ignore: [
       // Ship only electron-squirrel-startup (+ its nested deps); drop devDeps.
       // Anchored so it strips top-level node_modules only, not the nested
@@ -14,10 +12,6 @@ module.exports = {
       /\.idea/,
       /\.git/,
       /out/,
-      // Runtime only needs build/Release/ and index.js; strip everything else.
-      /native\/discord\/(src|include|lib|scripts|node_modules|binding\.gyp|package\.json)/,
-      /native\/discord\/build\/Release\/obj\.target/,
-      /native\/discord\/build\/Release\/\.deps/,
     ],
   },
   rebuildConfig: {},

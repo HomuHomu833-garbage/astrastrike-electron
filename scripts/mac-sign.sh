@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # Ad-hoc signs a macOS .app with entitlements via ldid. Unlike codesign, ldid
-# keeps restricted entitlements (disable-library-validation, etc.) without an
-# Apple cert — needed so the app can load the unsigned Discord SDK dylib.
+# keeps entitlements (allow-jit, etc.) without an Apple cert.
 # Usage: scripts/mac-sign.sh <path-to-.app> <entitlements.plist>
 set -euo pipefail
 
